@@ -39,8 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    if (userData != null) {
-      // Hay sesión guardada → ir directo al home
+    if (userData != null && userData['token'] != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -48,12 +47,12 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
       );
     } else {
-      // No hay sesión → ir al login
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     }
+    print('SESSION: $userData');
   }
 
   @override

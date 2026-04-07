@@ -30,11 +30,15 @@ class AuthService {
       if (loginResponse.statusCode == 200) {
         final loginData = json.decode(loginResponse.body);
 
+        // 🔥 Obtener token correctamente
         if (loginData['success'] != null &&
             loginData['success']['token'] != null) {
+
           final token = loginData['success']['token'];
 
-          // endpoint: /users/login/{login}
+          print("TOKEN OBTENIDO: $token");
+
+          // 🔥 Obtener datos del usuario
           final userResponse = await http.get(
             Uri.parse('${AppConstants.baseUrl}/users/login/$username'),
             headers: {
@@ -44,8 +48,15 @@ class AuthService {
           );
 
           if (userResponse.statusCode == 200) {
-            final userData = json.decode(userResponse.body);
+            final rawUserData = json.decode(userResponse.body);
+
+            // 🔥 Convertir correctamente el Map
+            final userData = Map<String, dynamic>.from(rawUserData);
+
+            // 🔥 Agregar token al usuario
             userData['token'] = token;
+
+            print("USER DATA LIMPIO: $userData");
 
             return {
               'success': true,
@@ -57,11 +68,14 @@ class AuthService {
             return {
               'success': false,
               'message':
-                  'Error al obtener datos del usuario: ${userResponse.statusCode}',
+                  'Error al obtener usuario: ${userResponse.statusCode}',
             };
           }
         } else {
-          return {'success': false, 'message': 'Credenciales incorrectas'};
+          return {
+            'success': false,
+            'message': 'Token no recibido',
+          };
         }
       } else if (loginResponse.statusCode == 403) {
         return {
@@ -75,21 +89,10 @@ class AuthService {
         };
       }
     } catch (e) {
-      if (e.toString().contains('SocketException')) {
-        return {
-          'success': false,
-          'message':
-              'No se puede conectar al servidor.\n¿Estás en la misma red WiFi?',
-        };
-      } else if (e.toString().contains('Timeout')) {
-        return {
-          'success': false,
-          'message':
-              'Tiempo de espera agotado.\nVerifica que el servidor esté funcionando.',
-        };
-      } else {
-        return {'success': false, 'message': 'Error: ${e.toString()}'};
-      }
+      return {
+        'success': false,
+        'message': 'Error: ${e.toString()}',
+      };
     }
   }
 }

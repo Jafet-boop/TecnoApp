@@ -30,15 +30,22 @@ class _LoginScreenState extends State<LoginScreen> {
         userController.text.trim(),
         passController.text.trim(),
       );
+      print("RESULT COMPLETO: $result");
 
       setState(() => loading = false);
 
       if (result['success'] == true) {
-        await SessionService.saveSession(result['user']); // ✅ guardar
+        final userData = Map<String, dynamic>.from({
+          ...result['user'],
+          'token': result['token'],
+        });
+
+        await SessionService.saveSession(userData);
+        print("GUARDADO: $userData");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(userData: result['user']),
+            builder: (context) => HomeScreen(userData: userData),
           ),
         );
       } else {

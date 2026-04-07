@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'package:app_tecno/utils/constants.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import '../services/dolibarr_service.dart';
@@ -59,7 +62,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
       _isLoading = false;
     });
 
-    // ✅ Cargar contactos después de obtener los datos
+    await _loadClientName();
     await _loadContacts();
     await _loadDocuments();
   }
@@ -104,6 +107,27 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
       _internalUsers = loadedInternalUsers;
       _loadingContacts = false;
     });
+  }
+
+  Future<void> _loadClientName() async {
+    final socid = _fullIntervention?['socid']?.toString();
+    if (socid == null || socid.isEmpty) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/thirdparties/$socid'),
+        headers: {'DOLAPIKEY': widget.token, 'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _clientName = data['name'] ?? 'Sin nombre';
+        });
+      }
+    } catch (e) {
+      print('Error cargando nombre del cliente: $e');
+    }
   }
 
   void _showEditNotesDialog() {
@@ -184,7 +208,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
       case '1':
         return 'Validada';
       case '2':
-        return 'En proceso';
+        return 'Facturada';
       case '3':
         return 'Terminada';
       default:
@@ -282,7 +306,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
         children: [
           const SizedBox(height: 16),
 
-          // ✅ Status movido aquí dentro de la pestaña
+          // Status movido aquí dentro de la pestaña
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
@@ -323,7 +347,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
                 intervention['description'] ?? 'N/A',
               ),
               const Divider(),
-              _buildInfoRow('Cliente', 'ID: ${intervention['socid'] ?? 'N/A'}'),
+              _buildInfoRow('Cliente', _clientName ?? 'Cargando...'),
               if (intervention['ref_client'] != null &&
                   intervention['ref_client'].toString().isNotEmpty) ...[
                 const Divider(),
@@ -412,7 +436,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
                     ),
                   ]
                 : lines.map((line) {
-                    // ✅ Dolibarr devuelve 'desc' en las líneas, con fallback a 'description'
+                    // Dolibarr devuelve 'desc' en las líneas, con fallback a 'description'
                     final lineDesc =
                         (line['desc'] != null &&
                             line['desc'].toString().isNotEmpty)
@@ -582,7 +606,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
     );
   }
 
-  // ✅ Necesitas este método ya que _buildInterventionTab lo usa
+  // Necesitas este método ya que _buildInterventionTab lo usa
   IconData _getStatusIcon(String? status) {
     switch (status) {
       case '0':
@@ -786,6 +810,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
   // Lista de documentos
   List<Map<String, dynamic>> _documents = [];
   bool _loadingDocuments = false;
+  String? _clientName;
 
   // Cargar documentos (agregar al initState después de _loadFullData)
   Future<void> _loadDocuments() async {
@@ -878,11 +903,12 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
                 if (result['success']) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Evidencia subida correctamente'),
+                      content: Text('Evidencia subida correctamente'),
                       backgroundColor: Colors.green,
                     ),
                   );
                   // Refrescar la lista de documentos aquí
+                  await _loadDocuments();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

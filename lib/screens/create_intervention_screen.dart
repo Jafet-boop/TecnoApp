@@ -127,7 +127,7 @@ class _CreateInterventionScreenState extends State<CreateInterventionScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Intervención creada exitosamente'),
+            content: Text('Intervención creada exitosamente'),
             backgroundColor: Colors.green,
           ),
         );

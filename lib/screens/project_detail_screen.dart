@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:app_tecno/utils/constants.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../services/project_service.dart';
 import 'create_task_screen.dart';
 import 'task_detail_screen.dart';
@@ -31,6 +35,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   List<Map<String, dynamic>> _thirdpartyContacts = [];
   List<Map<String, dynamic>> _internalUsers = [];
   bool _loadingContacts = false;
+  String? _clientName;
 
   @override
   void initState() {
@@ -59,7 +64,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     });
 
     // Cargar tareas y contactos EN PARALELO
-    await Future.wait([_loadTasks(), _loadContacts()]);
+    await Future.wait([_loadTasks(), _loadContacts(), _loadClientName()]);
   }
 
   Future<void> _loadTasks() async {
@@ -345,10 +350,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             children: [
               _buildInfoRow('Referencia', project['ref'] ?? 'N/A'),
               const Divider(height: 1),
-              _buildInfoRow(
-                'Cliente',
-                project['socid'] != null ? 'ID: ${project['socid']}' : 'N/A',
-              ),
+              _buildInfoRow('Cliente', _clientName ?? 'Cargando...'),
               if (project['description'] != null &&
                   project['description'].toString().isNotEmpty) ...[
                 const Divider(height: 1),
@@ -1058,6 +1060,27 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _loadClientName() async {
+    final socid = _fullProject?['socid']?.toString();
+    if (socid == null || socid.isEmpty) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/thirdparties/$socid'),
+        headers: {'DOLAPIKEY': widget.token, 'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _clientName = data['name'] ?? 'Sin nombre';
+        });
+      }
+    } catch (e) {
+      print('Error cargando nombre del cliente: $e');
+    }
   }
 
   Future<void> _updateNotes(String pub, String priv) async {
