@@ -41,18 +41,39 @@ class DolibarrService {
   // Obtener clientes/terceros
   static Future<List<dynamic>> getThirdparties(String token) async {
     try {
-      final response = await http.get(
-        Uri.parse('${AppConstants.baseUrl}/thirdparties'),
-        headers: {'DOLAPIKEY': token, 'Accept': 'application/json'},
-      );
+      List<dynamic> allThirdparties = [];
+      int page = 0;
+      const int limit = 100;
+      bool hasMore = true;
 
-      print('Thirdparties status: ${response.statusCode}');
+      while (hasMore) {
+        final response = await http.get(
+          Uri.parse(
+            '${AppConstants.baseUrl}/thirdparties?limit=$limit&page=$page&sortfield=t.rowid&sortorder=ASC',
+          ),
+          headers: {'DOLAPIKEY': token, 'Accept': 'application/json'},
+        );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        return [];
+        print('Thirdparties page $page - status: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+
+          if (data.isEmpty) {
+            hasMore = false; // Ya no hay más páginas
+          } else {
+            allThirdparties.addAll(data);
+            if (data.length < limit) {
+              hasMore = false; // Última página (incompleta)
+            } else {
+              page++; // Siguiente página
+            }
+          }
+        } else { 
+          hasMore = false;
+        }
       }
+      return allThirdparties;
     } catch (e) {
       print('Error obteniendo terceros: $e');
       return [];

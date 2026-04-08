@@ -50,7 +50,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
   }
 
   Future<void> _loadFullData() async {
-    setState(() => _isLoading = true);
+    setState(() => _isLoading = true); 
 
     final fullData = await DolibarrService.getInterventionById(
       token: widget.token,
