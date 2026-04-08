@@ -18,10 +18,17 @@ class ProjectsListScreen extends StatefulWidget {
   State<ProjectsListScreen> createState() => _ProjectsListScreenState();
 }
 
-class _ProjectsListScreenState extends State<ProjectsListScreen> {
+class _ProjectsListScreenState extends State<ProjectsListScreen>
+    with SingleTickerProviderStateMixin {
   List<dynamic> _projects = [];
   bool _isLoading = true;
   String _errorMessage = '';
+
+  // FAB expandable
+  bool _fabExpanded = false;
+  late AnimationController _fabAnimController;
+  late Animation<double> _fabRotation;
+  late Animation<double> _fabScale;
 
   final TextEditingController _searchController = TextEditingController();
   String? _selectedStatus;
@@ -41,12 +48,46 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   void initState() {
     super.initState();
     _loadProjects();
+
+    _fabAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    // Rota el "+" 135° para parecer una "×" al expandirse
+    _fabRotation = Tween<double>(begin: 0.0, end: 0.375).animate(
+      CurvedAnimation(parent: _fabAnimController, curve: Curves.easeInOut),
+    );
+    _fabScale = CurvedAnimation(
+      parent: _fabAnimController,
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _fabAnimController.dispose();
     super.dispose();
+  }
+
+  void _toggleFab() {
+    setState(() {
+      _fabExpanded = !_fabExpanded;
+      if (_fabExpanded) {
+        _fabAnimController.forward();
+      } else {
+        _fabAnimController.reverse();
+      }
+    });
+  }
+
+  void _closeFab() {
+    if (_fabExpanded) {
+      setState(() {
+        _fabExpanded = false;
+        _fabAnimController.reverse();
+      });
+    }
   }
 
   Future<void> _loadProjects() async {
@@ -69,7 +110,6 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
     }
   }
 
-  // Nuevo filtro Pros, En Cotizacion, etc.
   List<dynamic> get _filteredProjects {
     List<dynamic> filtered = _projects;
 
@@ -91,462 +131,561 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
     return filtered;
   }
 
-Color _statusColor(String? s) {
-  switch (s) {
-    case '1': return Colors.purple;
-    case '2': return Colors.orange;
-    case '3': return Colors.blue;
-    case '4': return Colors.cyan;
-    case '5': return Colors.indigo;
-    case '6': return Colors.teal;
-    case '7': return Colors.green;
-    default:  return Colors.grey;
+  Color _statusColor(String? s) {
+    switch (s) {
+      case '1': return Colors.purple;
+      case '2': return Colors.orange;
+      case '3': return Colors.blue;
+      case '4': return Colors.cyan;
+      case '5': return Colors.indigo;
+      case '6': return Colors.teal;
+      case '7': return Colors.green;
+      default:  return Colors.grey;
+    }
   }
-}
 
-String _statusLabel(String? s) {
-  switch (s) {
-    case '1': return 'Prospecto';
-    case '2': return 'Por Cotizar';
-    case '3': return 'Seguimiento';
-    case '4': return 'Por Atender';
-    case '5': return 'En Proceso';
-    case '6': return 'Por Cobrar';
-    case '7': return 'Postventa';
-    default:  return 'Sin estado';
+  String _statusLabel(String? s) {
+    switch (s) {
+      case '1': return 'Prospecto';
+      case '2': return 'Por Cotizar';
+      case '3': return 'Seguimiento';
+      case '4': return 'Por Atender';
+      case '5': return 'En Proceso';
+      case '6': return 'Por Cobrar';
+      case '7': return 'Postventa';
+      default:  return 'Sin estado';
+    }
   }
-}
 
-IconData _statusIcon(String? s) {
-  switch (s) {
-    case '1': return Icons.person_search;
-    case '2': return Icons.request_quote;
-    case '3': return Icons.track_changes;
-    case '4': return Icons.pending_actions;
-    case '5': return Icons.construction;
-    case '6': return Icons.payments;
-    case '7': return Icons.thumb_up;
-    default:  return Icons.help_outline;
+  IconData _statusIcon(String? s) {
+    switch (s) {
+      case '1': return Icons.person_search;
+      case '2': return Icons.request_quote;
+      case '3': return Icons.track_changes;
+      case '4': return Icons.pending_actions;
+      case '5': return Icons.construction;
+      case '6': return Icons.payments;
+      case '7': return Icons.thumb_up;
+      default:  return Icons.help_outline;
+    }
   }
-}
 
+  /// Formatea timestamp Unix a "01 Abr 2026"
   String _formatDate(dynamic timestamp) {
-    if (timestamp == null || timestamp == '') return 'N/A';
+    if (timestamp == null || timestamp == '') return '';
     try {
       final date = DateTime.fromMillisecondsSinceEpoch(
         int.parse(timestamp.toString()) * 1000,
       );
-      return '${date.day}/${date.month}/${date.year}';
+      const months = [
+        'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+      ];
+      final day = date.day.toString().padLeft(2, '0');
+      final month = months[date.month - 1];
+      return '$day $month ${date.year}';
     } catch (_) {
       return 'N/A';
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: Column(
-        children: [
-          // ── Header ─────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            color: Colors.white,
-            child: Column(
-              children: [
-                // Buscador
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por referencia o título...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.blue),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.grey),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: const Color(0xFFF0F6FF),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+  // ── Mini-FAB de cada opción del Speed Dial ───────────────────
+  Widget _buildFabOption({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required int index,
+  }) {
+    return ScaleTransition(
+      scale: _fabScale,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Etiqueta flotante
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                  onChanged: (_) => setState(() {}),
-                ),
-
-                const SizedBox(height: 10),
-
-                // Filtros de status
-                SizedBox(
-                  height: 36,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _statusOptions.length,
-                    itemBuilder: (context, index) {
-                      final option = _statusOptions[index];
-                      final isSelected = _selectedStatus == option['value'];
-                      final color = option['color'] as Color;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          selected: isSelected,
-                          label: Text(option['label']),
-                          selectedColor: color.withOpacity(0.15),
-                          checkmarkColor: color,
-                          labelStyle: TextStyle(
-                            color: isSelected ? color : Colors.grey[700],
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            fontSize: 12,
-                          ),
-                          side: BorderSide(
-                            color: isSelected ? color : Colors.grey.shade300,
-                          ),
-                          onSelected: (_) {
-                            setState(() => _selectedStatus = option['value']);
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Contador
-          if (!_isLoading && _errorMessage.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${_filteredProjects.length} proyecto(s) encontrado(s)',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ],
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color,
                 ),
               ),
             ),
+            const SizedBox(width: 10),
+            // Mini FAB
+            FloatingActionButton.small(
+              heroTag: 'fab_option_$index',
+              backgroundColor: color,
+              onPressed: () {
+                _closeFab();
+                onTap();
+              },
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // ── Lista ───────────────────────────────────────────────
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF1565C0)),
-                  )
-                : _errorMessage.isNotEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text(_errorMessage),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadProjects,
-                          child: const Text('Reintentar'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _filteredProjects.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.folder_open,
-                          size: 80,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No hay proyectos',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                        if (_selectedStatus != null ||
-                            _searchController.text.isNotEmpty)
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _selectedStatus = null;
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      // Cierra el FAB al tocar fuera
+      onTap: _closeFab,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F7FA),
+        body: Column(
+          children: [
+            // ── Header ─────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              color: Colors.white,
+              child: Column(
+                children: [
+                  // Buscador
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por referencia o título...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.blue),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon:
+                                  const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: () {
                                 _searchController.clear();
-                              });
-                            },
-                            child: const Text('Limpiar filtros'),
-                          ),
-                      ],
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: const Color(0xFFF0F6FF),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _loadProjects,
+                    onChanged: (_) => setState(() {}),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Filtros de status
+                  SizedBox(
+                    height: 36,
                     child: ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _filteredProjects.length,
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _statusOptions.length,
                       itemBuilder: (context, index) {
-                        final project = _filteredProjects[index];
-                        final status = project['opp_status']?.toString();
-                        final color = _statusColor(status);
-                        final isPublic = project['public']?.toString() == '1';
+                        final option = _statusOptions[index];
+                        final isSelected = _selectedStatus == option['value'];
+                        final color = option['color'] as Color;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.08),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProjectDetailScreen(
-                                    project: project,
-                                    token: widget.token,
-                                    userData: widget.userData,
-                                  ),
-                                ),
-                              );
-                              _loadProjects();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Fila superior
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: color.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          _statusIcon(status),
-                                          color: color,
-                                          size: 22,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              project['title'] ?? 'Sin título',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              project['ref'] ?? 'N/A',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[500],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 10),
-                                  const Divider(height: 1),
-                                  const SizedBox(height: 10),
-
-                                  // Fila inferior
-                                  Row(
-                                    children: [
-                                      // Status badge
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: color.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: color.withOpacity(0.4),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _statusLabel(status),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: color,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-
-                                      const SizedBox(width: 8),
-
-                                      // Público/Privado badge
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isPublic
-                                              ? Colors.blue.withOpacity(0.1)
-                                              : Colors.orange.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              isPublic
-                                                  ? Icons.public
-                                                  : Icons.lock,
-                                              size: 11,
-                                              color: isPublic
-                                                  ? Colors.blue
-                                                  : Colors.orange,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              isPublic ? 'Público' : 'Privado',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isPublic
-                                                    ? Colors.blue
-                                                    : Colors.orange,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      const Spacer(),
-
-                                      // Fechas
-                                      Icon(
-                                        Icons.calendar_today,
-                                        size: 12,
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${_formatDate(project['date_start'])} → ${_formatDate(project['date_end'])}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            selected: isSelected,
+                            label: Text(option['label']),
+                            selectedColor: color.withOpacity(0.15),
+                            checkmarkColor: color,
+                            labelStyle: TextStyle(
+                              color: isSelected ? color : Colors.grey[700],
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              fontSize: 12,
                             ),
+                            side: BorderSide(
+                              color:
+                                  isSelected ? color : Colors.grey.shade300,
+                            ),
+                            onSelected: (_) {
+                              setState(
+                                  () => _selectedStatus = option['value']);
+                            },
                           ),
                         );
                       },
                     ),
                   ),
-          ),
-        ],
-      ),
-
-      // ── FAB crear proyecto ────────────────────────────────────
-      // ── FABs ─────────────────────────────────────────────────
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Botón Mis Tareas
-          FloatingActionButton.extended(
-            heroTag: 'fab_tasks',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MyTasksScreen(
-                    token: widget.token,
-                    userData: widget.userData,
-                  ),
-                ),
-              );
-            },
-            backgroundColor: const Color(0xFF6A1B9A),
-            icon: const Icon(Icons.task_alt, color: Colors.white),
-            label: const Text(
-              'Mis Tareas',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+                ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 12),
-
-          // Botón Nuevo Proyecto
-          FloatingActionButton.extended(
-            heroTag: 'fab_project',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CreateProjectScreen(
-                    token: widget.token,
-                    userData: widget.userData,
+            // Contador
+            if (!_isLoading && _errorMessage.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${_filteredProjects.length} proyecto(s) encontrado(s)',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   ),
                 ),
-              );
-              _loadProjects();
-            },
-            backgroundColor: const Color(0xFF1565C0),
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text(
-              'Nuevo Proyecto',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              ),
+
+            // ── Lista ───────────────────────────────────────────────
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF1565C0),
+                      ),
+                    )
+                  : _errorMessage.isNotEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error,
+                              size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(_errorMessage),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadProjects,
+                            child: const Text('Reintentar'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _filteredProjects.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.folder_open,
+                            size: 80,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No hay proyectos',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          if (_selectedStatus != null ||
+                              _searchController.text.isNotEmpty)
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedStatus = null;
+                                  _searchController.clear();
+                                });
+                              },
+                              child: const Text('Limpiar filtros'),
+                            ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadProjects,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _filteredProjects.length,
+                        itemBuilder: (context, index) {
+                          final project = _filteredProjects[index];
+                          final status = project['opp_status']?.toString();
+                          final color = _statusColor(status);
+                          final isPublic =
+                              project['public']?.toString() == '1';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () async {
+                                _closeFab();
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        ProjectDetailScreen(
+                                      project: project,
+                                      token: widget.token,
+                                      userData: widget.userData,
+                                    ),
+                                  ),
+                                );
+                                _loadProjects();
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    // Fila superior
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: color.withOpacity(0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: Icon(
+                                            _statusIcon(status),
+                                            color: color,
+                                            size: 22,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                project['title'] ??
+                                                    'Sin título',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                ),
+                                                maxLines: 2,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                project['ref'] ?? 'N/A',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[500],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 14,
+                                          color: Colors.grey,
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 10),
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 10),
+
+                                    // Fila badges (status + público/privado)
+                                    Row(
+                                      children: [
+                                        // Status badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: color.withOpacity(0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: color.withOpacity(0.4),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _statusLabel(status),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: color,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+
+                                        const SizedBox(width: 8),
+
+                                        // Público/Privado badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isPublic
+                                                ? Colors.blue.withOpacity(0.1)
+                                                : Colors.orange
+                                                    .withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isPublic
+                                                    ? Icons.public
+                                                    : Icons.lock,
+                                                size: 11,
+                                                color: isPublic
+                                                    ? Colors.blue
+                                                    : Colors.orange,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                isPublic
+                                                    ? 'Público'
+                                                    : 'Privado',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: isPublic
+                                                      ? Colors.blue
+                                                      : Colors.orange,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 6),
+
+                                    // ── Fila fechas (línea propia) ────────────
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today_rounded,
+                                          size: 12,
+                                          color: Colors.grey[400],
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _formatDate(project['date_start']),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4),
+                                          child: Icon(
+                                            Icons.arrow_forward,
+                                            size: 10,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                        Text(
+                                          _formatDate(project['date_end']),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+            ),
+          ],
+        ),
+
+        // ── FAB único con Speed Dial ────────────────────────────
+        floatingActionButton: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Opciones (visibles sólo cuando está expandido)
+            if (_fabExpanded) ...[
+              _buildFabOption(
+                label: 'Mis Tareas',
+                icon: Icons.task_alt,
+                color: const Color(0xFF6A1B9A),
+                index: 0,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MyTasksScreen(
+                        token: widget.token,
+                        userData: widget.userData,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildFabOption(
+                label: 'Nuevo Proyecto',
+                icon: Icons.folder_special,
+                color: const Color(0xFF1565C0),
+                index: 1,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreateProjectScreen(
+                        token: widget.token,
+                        userData: widget.userData,
+                      ),
+                    ),
+                  );
+                  _loadProjects();
+                },
+              ),
+            ],
+
+            // FAB principal — rota al expandirse
+            RotationTransition(
+              turns: _fabRotation,
+              child: FloatingActionButton(
+                heroTag: 'fab_main',
+                onPressed: _toggleFab,
+                backgroundColor: _fabExpanded
+                    ? Colors.grey[700]
+                    : const Color(0xFF1565C0),
+                child:
+                    const Icon(Icons.add, color: Colors.white, size: 28),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

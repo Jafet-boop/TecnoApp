@@ -1,4 +1,7 @@
+import 'package:app_tecno/utils/constants.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'intervention_detail_screen.dart';
 import '../services/dolibarr_service.dart';
 import '../services/session_service.dart';
@@ -13,26 +16,20 @@ class SeguimientoScreen extends StatefulWidget {
 }
 
 class _SeguimientoScreenState extends State<SeguimientoScreen> {
-  // ── Estado general ──────────────────────────────────────────
   bool _isLoading = true;
   String _errorMessage = '';
 
-  // ── Usuario logueado ────────────────────────────────────────
   String? _loggedUserId;
   String _loggedUserName = '';
 
-  // ── Modo "ver todos" (toggle opcional) ─────────────────────
   bool _showingAll = false;
 
-  // ── Técnicos disponibles (para modo "ver todos") ────────────
   List<Map<String, dynamic>> _technicians = [];
   Map<String, dynamic>? _selectedTechnician;
 
-  // ── Intervenciones ──────────────────────────────────────────
   List<Map<String, dynamic>> _allPendingInterventions = [];
   List<Map<String, dynamic>> _filteredInterventions = [];
 
-  // ── Búsqueda ────────────────────────────────────────────────
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -47,7 +44,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     super.dispose();
   }
 
-  // ── 1. Leer sesión y luego cargar datos ─────────────────────
   Future<void> _initAndLoad() async {
     final session = await SessionService.getSavedSession();
     if (session != null) {
@@ -67,7 +63,23 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     await _loadData();
   }
 
-  // ── 2. Carga paralela de intervenciones ─────────────────────
+  Future<String> _fetchClientName(String socid) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/thirdparties/$socid'),
+        headers: {'DOLAPIKEY': token, 'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['name'] ?? 'Sin nombre';
+      }
+    } catch (_) {}
+    return 'Sin nombre';
+  }
+
+  // Getter para acceder al token fácilmente
+  String get token => widget.token;
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
@@ -75,7 +87,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     });
 
     try {
-      // Traer las intervenciones pendientes
       final results = await Future.wait([
         DolibarrService.getInterventions(widget.token, statusFilter: '0'),
         DolibarrService.getInterventions(widget.token, statusFilter: '1'),
@@ -86,7 +97,7 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
         ...results[1].cast<Map<String, dynamic>>(),
       ];
 
-      // Cargar detalles completos EN PARALELO (todos a la vez)
+      // Cargar detalles completos EN PARALELO
       final fullList = await Future.wait(
         combinedRaw.map((intervention) async {
           final full = await DolibarrService.getInterventionById(
@@ -97,7 +108,18 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
         }),
       );
 
-      // Recopilar IDs únicos de técnicos internos
+      // Enriquecer con nombre real del cliente EN PARALELO
+      await Future.wait(fullList.map((intervention) async {
+        final existing = intervention['thirdparty_name']?.toString() ?? '';
+        if (existing.isNotEmpty) return;
+
+        final socid = intervention['socid']?.toString();
+        if (socid == null || socid.isEmpty || socid == '0') return;
+
+        intervention['thirdparty_name'] = await _fetchClientName(socid);
+      }));
+
+      // Recopilar IDs únicos de técnicos
       final Set<String> allTechIds = {};
       for (final intervention in fullList) {
         final internalIds =
@@ -134,12 +156,10 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     }
   }
 
-  // ── 3. Filtro: usuario logueado O técnico seleccionado ───────
   void _applyFilter() {
     List<Map<String, dynamic>> result = List.from(_allPendingInterventions);
 
     if (_showingAll) {
-      // Modo "ver todos": filtrar por técnico seleccionado en dropdown
       if (_selectedTechnician != null) {
         final selectedId = _selectedTechnician!['id'].toString();
         result = result.where((i) {
@@ -148,7 +168,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
         }).toList();
       }
     } else {
-      // Modo normal: solo mis intervenciones (usuario logueado)
       if (_loggedUserId != null) {
         result = result.where((i) {
           final ids = i['contacts_ids_internal'] as List<dynamic>? ?? [];
@@ -157,7 +176,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
       }
     }
 
-    // Filtro de texto
     final query = _searchController.text.trim().toLowerCase();
     if (query.isNotEmpty) {
       result = result.where((i) {
@@ -173,44 +191,42 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
   // ── Helpers ──────────────────────────────────────────────────
   Color _getStatusColor(String? status) {
     switch (status) {
-      case '0':
-        return const Color(0xFF78909C);
-      case '1':
-        return const Color.fromARGB(255, 0, 184, 230);
-      default:
-        return Colors.grey;
+      case '0': return const Color(0xFF78909C);
+      case '1': return const Color.fromARGB(255, 0, 184, 230);
+      default:  return Colors.grey;
     }
   }
 
   String _getStatusLabel(String? status) {
     switch (status) {
-      case '0':
-        return 'Borrador';
-      case '1':
-        return 'En Curso';
-      default:
-        return 'Desconocido';
+      case '0': return 'Borrador';
+      case '1': return 'En Curso';
+      default:  return 'Desconocido';
     }
   }
 
   IconData _getStatusIcon(String? status) {
     switch (status) {
-      case '0':
-        return Icons.edit_note;
-      case '1':
-        return Icons.build_circle;
-      default:
-        return Icons.help_outline;
+      case '0': return Icons.edit_note;
+      case '1': return Icons.build_circle;
+      default:  return Icons.help_outline;
     }
   }
 
+  /// Formato "01 Abr 2026"
   String _formatDate(dynamic timestamp) {
     if (timestamp == null || timestamp == '') return 'N/A';
     try {
       final date = DateTime.fromMillisecondsSinceEpoch(
         int.parse(timestamp.toString()) * 1000,
       );
-      return '${date.day}/${date.month}/${date.year}';
+      const months = [
+        'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+      ];
+      final day   = date.day.toString().padLeft(2, '0');
+      final month = months[date.month - 1];
+      return '$day $month ${date.year}';
     } catch (_) {
       return 'N/A';
     }
@@ -218,16 +234,15 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
 
   String _getTechName(Map<String, dynamic> user) {
     final first = user['firstname'] ?? '';
-    final last = user['lastname'] ?? '';
-    final full = '$first $last'.trim();
+    final last  = user['lastname']  ?? '';
+    final full  = '$first $last'.trim();
     return full.isNotEmpty ? full : 'Sin nombre';
   }
 
   String _getTechInitials(Map<String, dynamic> user) {
     final f = (user['firstname'] ?? '').toString();
-    final l = (user['lastname'] ?? '').toString();
-    return '${f.isNotEmpty ? f[0] : ''}${l.isNotEmpty ? l[0] : ''}'
-        .toUpperCase();
+    final l = (user['lastname']  ?? '').toString();
+    return '${f.isNotEmpty ? f[0] : ''}${l.isNotEmpty ? l[0] : ''}'.toUpperCase();
   }
 
   int _countByStatus(String status) => _filteredInterventions
@@ -240,11 +255,11 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Seguimiento'),
+        // 2. Cambiado "Seguimiento" → "Pendientes"
+        title: const Text('Pendientes'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
-          // Toggle: mis pendientes ↔ ver todos
           TextButton.icon(
             onPressed: () {
               setState(() {
@@ -327,7 +342,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     );
   }
 
-  // ── Header con nombre del técnico activo ─────────────────────
   Widget _buildHeader() {
     final title = _showingAll
         ? (_selectedTechnician != null
@@ -362,7 +376,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     );
   }
 
-  // ── Dropdown de técnicos (solo en modo "ver todos") ──────────
   Widget _buildTechnicianDropdown() {
     return Container(
       color: Colors.white,
@@ -400,7 +413,13 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          Text(_getTechName(tech)),
+                          // 3. Flexible evita el overflow en nombres largos
+                          Flexible(
+                            child: Text(
+                              _getTechName(tech),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -426,7 +445,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     );
   }
 
-  // ── Buscador ─────────────────────────────────────────────────
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
@@ -461,7 +479,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     );
   }
 
-  // ── Badges resumen ───────────────────────────────────────────
   Widget _buildSummaryBadges() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -523,7 +540,6 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     );
   }
 
-  // ── Lista ────────────────────────────────────────────────────
   Widget _buildList() {
     if (_filteredInterventions.isEmpty) {
       return Expanded(
@@ -568,9 +584,8 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
     );
   }
 
-  // ── Tarjeta de intervención ──────────────────────────────────
   Widget _buildCard(Map<String, dynamic> intervention) {
-    final status = intervention['statut']?.toString();
+    final status      = intervention['statut']?.toString();
     final statusColor = _getStatusColor(status);
     final internalIds =
         intervention['contacts_ids_internal'] as List<dynamic>? ?? [];
@@ -580,6 +595,11 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
             internalIds.any((id) => id.toString() == t['id'].toString()))
         .map((t) => _getTechName(t))
         .join(', ');
+
+    // 1. Nombre del cliente (ya enriquecido en _loadData)
+    final clientName = intervention['thirdparty_name']?.toString().isNotEmpty == true
+        ? intervention['thirdparty_name']
+        : 'Sin cliente';
 
     return Card(
       elevation: 2,
@@ -662,35 +682,40 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
               const Divider(height: 1),
               const SizedBox(height: 8),
 
-              // Cliente + fecha
+              // 1. Cliente con nombre real + fecha con nuevo formato
               Row(
                 children: [
                   const Icon(Icons.business, size: 13, color: Colors.grey),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      intervention['thirdparty_name'] ??
-                          'ID: ${intervention['socid'] ?? 'N/A'}',
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.grey),
+                      clientName,
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.grey),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Icon(Icons.calendar_today,
-                      size: 13, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Icon(Icons.calendar_today_rounded,
+                      size: 13, color: Colors.grey[400]),
                   const SizedBox(width: 4),
                   Text(
+                    // 1. Nuevo formato de fecha
                     _formatDate(intervention['datec']),
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
 
-              // Técnicos (solo en modo "ver todos")
+              // Técnicos asignados (solo en modo "ver todos")
+              // 3. Wrap evita overflow con nombres largos
               if (_showingAll) ...[
                 const SizedBox(height: 6),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       assignedNames.isNotEmpty
@@ -720,6 +745,7 @@ class _SeguimientoScreenState extends State<SeguimientoScreen> {
                               : FontStyle.italic,
                         ),
                         overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
                       ),
                     ),
                   ],

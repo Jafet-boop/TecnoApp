@@ -182,11 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
           BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Proyectos'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
-            label: 'Intervenciones',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.add_circle), label: 'Crear'),
+          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Intervenciones',),
         ],
       ),
     );
