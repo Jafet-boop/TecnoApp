@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../services/project_service.dart';
+import '../utils/constants.dart';
 import 'project_detail_screen.dart';
 import 'create_project_screen.dart';
 import 'MytaskScreen.dart';
@@ -7,32 +10,32 @@ import 'MytaskScreen.dart';
 class ProjectsListScreen extends StatefulWidget {
   final String token;
   final Map<String, dynamic> userData;
-
+ 
   const ProjectsListScreen({
     super.key,
     required this.token,
     required this.userData,
   });
-
+ 
   @override
   State<ProjectsListScreen> createState() => _ProjectsListScreenState();
 }
-
+ 
 class _ProjectsListScreenState extends State<ProjectsListScreen>
     with SingleTickerProviderStateMixin {
   List<dynamic> _projects = [];
   bool _isLoading = true;
   String _errorMessage = '';
-
+ 
   // FAB expandable
   bool _fabExpanded = false;
   late AnimationController _fabAnimController;
   late Animation<double> _fabRotation;
   late Animation<double> _fabScale;
-
+ 
   final TextEditingController _searchController = TextEditingController();
   String? _selectedStatus;
-
+ 
   final List<Map<String, dynamic>> _statusOptions = [
     {'value': null, 'label': 'Todos', 'color': Colors.grey},
     {'value': '1', 'label': 'Prospecto', 'color': Colors.purple},
@@ -43,12 +46,12 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
     {'value': '6', 'label': 'Por Cobrar', 'color': Colors.teal},
     {'value': '7', 'label': 'Postventa', 'color': Colors.green},
   ];
-
+ 
   @override
   void initState() {
     super.initState();
     _loadProjects();
-
+ 
     _fabAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -62,14 +65,14 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       curve: Curves.easeInOut,
     );
   }
-
+ 
   @override
   void dispose() {
     _searchController.dispose();
     _fabAnimController.dispose();
     super.dispose();
   }
-
+ 
   void _toggleFab() {
     setState(() {
       _fabExpanded = !_fabExpanded;
@@ -80,7 +83,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       }
     });
   }
-
+ 
   void _closeFab() {
     if (_fabExpanded) {
       setState(() {
@@ -89,15 +92,36 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       });
     }
   }
-
+ 
   Future<void> _loadProjects() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
-
+ 
     try {
       final data = await ProjectService.getProjects(widget.token);
+ 
+      // Enriquecer con nombre real del cliente en paralelo
+      await Future.wait(data.map((project) async {
+        final socid = project['socid']?.toString();
+        if (socid == null || socid.isEmpty || socid == '0') return;
+ 
+        try {
+          final response = await http.get(
+            Uri.parse('${AppConstants.baseUrl}/thirdparties/$socid'),
+            headers: {
+              'DOLAPIKEY': widget.token,
+              'Accept': 'application/json',
+            },
+          );
+          if (response.statusCode == 200) {
+            final client = json.decode(response.body);
+            project['client_name'] = client['name'] ?? '';
+          }
+        } catch (_) {}
+      }));
+ 
       setState(() {
         _projects = data;
         _isLoading = false;
@@ -109,16 +133,16 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       });
     }
   }
-
+ 
   List<dynamic> get _filteredProjects {
     List<dynamic> filtered = _projects;
-
+ 
     if (_selectedStatus != null) {
       filtered = filtered.where((p) {
         return p['opp_status']?.toString() == _selectedStatus;
       }).toList();
     }
-
+ 
     final query = _searchController.text.toLowerCase();
     if (query.isNotEmpty) {
       filtered = filtered.where((p) {
@@ -127,10 +151,10 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
         return ref.contains(query) || title.contains(query);
       }).toList();
     }
-
+ 
     return filtered;
   }
-
+ 
   Color _statusColor(String? s) {
     switch (s) {
       case '1': return Colors.purple;
@@ -143,7 +167,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       default:  return Colors.grey;
     }
   }
-
+ 
   String _statusLabel(String? s) {
     switch (s) {
       case '1': return 'Prospecto';
@@ -156,7 +180,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       default:  return 'Sin estado';
     }
   }
-
+ 
   IconData _statusIcon(String? s) {
     switch (s) {
       case '1': return Icons.person_search;
@@ -169,10 +193,10 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       default:  return Icons.help_outline;
     }
   }
-
+ 
   /// Formatea timestamp Unix a "01 Abr 2026"
   String _formatDate(dynamic timestamp) {
-    if (timestamp == null || timestamp == '') return '';
+    if (timestamp == null || timestamp == '') return 'N/A';
     try {
       final date = DateTime.fromMillisecondsSinceEpoch(
         int.parse(timestamp.toString()) * 1000,
@@ -188,7 +212,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       return 'N/A';
     }
   }
-
+ 
   // ── Mini-FAB de cada opción del Speed Dial ───────────────────
   Widget _buildFabOption({
     required String label,
@@ -243,7 +267,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
       ),
     );
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -285,9 +309,9 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
-
+ 
                   const SizedBox(height: 10),
-
+ 
                   // Filtros de status
                   SizedBox(
                     height: 36,
@@ -298,7 +322,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                         final option = _statusOptions[index];
                         final isSelected = _selectedStatus == option['value'];
                         final color = option['color'] as Color;
-
+ 
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: FilterChip(
@@ -329,7 +353,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                 ],
               ),
             ),
-
+ 
             // Contador
             if (!_isLoading && _errorMessage.isEmpty)
               Padding(
@@ -342,7 +366,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                   ),
                 ),
               ),
-
+ 
             // ── Lista ───────────────────────────────────────────────
             Expanded(
               child: _isLoading
@@ -411,7 +435,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                           final color = _statusColor(status);
                           final isPublic =
                               project['public']?.toString() == '1';
-
+ 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
@@ -499,11 +523,11 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                                         ),
                                       ],
                                     ),
-
+ 
                                     const SizedBox(height: 10),
                                     const Divider(height: 1),
                                     const SizedBox(height: 10),
-
+ 
                                     // Fila badges (status + público/privado)
                                     Row(
                                       children: [
@@ -530,9 +554,9 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                                             ),
                                           ),
                                         ),
-
+ 
                                         const SizedBox(width: 8),
-
+ 
                                         // Público/Privado badge
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -576,9 +600,33 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                                         ),
                                       ],
                                     ),
-
+ 
+                                    // ── Fila cliente ──────────────────────
+                                    if ((project['client_name'] ?? '').toString().isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.business,
+                                              size: 12,
+                                              color: Colors.grey[400]),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              project['client_name'],
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[600],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+ 
                                     const SizedBox(height: 6),
-
+ 
                                     // ── Fila fechas (línea propia) ────────────
                                     Row(
                                       children: [
@@ -626,7 +674,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
             ),
           ],
         ),
-
+ 
         // ── FAB único con Speed Dial ────────────────────────────
         floatingActionButton: Column(
           mainAxisSize: MainAxisSize.min,
@@ -670,7 +718,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen>
                 },
               ),
             ],
-
+ 
             // FAB principal — rota al expandirse
             RotationTransition(
               turns: _fabRotation,

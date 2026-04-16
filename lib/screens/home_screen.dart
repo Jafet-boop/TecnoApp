@@ -182,29 +182,32 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
           BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Proyectos'),
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Intervenciones',),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: 'Intervenciones',
+          ),
         ],
       ),
     );
   }
 
-String _getInitials(String name) {
-  // 1. Limpiamos espacios y verificamos si está vacío de una vez
-  String cleanName = name.trim();
-  if (cleanName.isEmpty) {
-    return 'U'; // 'U' de Usuario o lo que prefieras
+  String _getInitials(String name) {
+    // 1. Limpiamos espacios y verificamos si está vacío de una vez
+    String cleanName = name.trim();
+    if (cleanName.isEmpty) {
+      return 'U'; // 'U' de Usuario o lo que prefieras
+    }
+    List<String> parts = cleanName.split(' ');
+    // 2. Si tiene nombre y apellido (ej. "Juan Pérez")
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    // 3. Si solo tiene un nombre (ej. "Juan")
+    if (parts[0].isNotEmpty) {
+      return parts[0][0].toUpperCase();
+    }
+    return 'U';
   }
-  List<String> parts = cleanName.split(' ');
-  // 2. Si tiene nombre y apellido (ej. "Juan Pérez")
-  if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
-    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  }
-  // 3. Si solo tiene un nombre (ej. "Juan")
-  if (parts[0].isNotEmpty) {
-    return parts[0][0].toUpperCase();
-  }
-  return 'U';
-}
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
