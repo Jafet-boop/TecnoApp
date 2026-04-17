@@ -109,13 +109,14 @@ class DolibarrService {
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
 
-        // ✅ Filtro local por status
+        // Filtro local por status
         if (statusFilter != null && statusFilter.isNotEmpty) {
           data = data.where((i) {
             return i['statut']?.toString() == statusFilter;
           }).toList();
-        }
+        } 
 
+        // Filtro local por referencia del cliente
         if (refClientfilter != null && refClientfilter.isNotEmpty) {
           data = data.where((i) {
             final refClient = (i['ref_client'] ?? '').toString().toUpperCase();
