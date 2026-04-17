@@ -886,26 +886,20 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
                 );
 
                 // 3. Llamar al servicio de subida
-                // NOTA: Asegúrate de tener acceso a 'interventionRef' y 'token' en este widget
                 final interventionRef =
                     _fullIntervention?['ref'] ?? intervention['ref'];
 
-                // Generar nombre limpio: REF_YYYYMMDD_HHMMSS.jpg
-                final now = DateTime.now();
-                final timestamp =
-                    '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
-                    '_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
                 final extension = image.name.contains('.')
                     ? image.name.split('.').last.toLowerCase()
                     : 'jpg';
-                final cleanFilename =
-                    '${interventionRef}_$timestamp.$extension';
+                final cleanFilename = 'IMG_$interventionRef.$extension';
 
                 final result = await DolibarrService.uploadDocument(
                   interventionRef: interventionRef,
                   filePath: image.path,
                   filename: cleanFilename,
                 );
+
                 // 4. Quitar el indicador de carga y mostrar resultado
                 Navigator.pop(context); // Cierra el loading
 

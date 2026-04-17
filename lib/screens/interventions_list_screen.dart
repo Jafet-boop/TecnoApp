@@ -35,12 +35,22 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
   String? _selectedStatus;
 
   final List<Map<String, dynamic>> _statusOptions = [
-    {'value': null, 'label': 'Todos',      'color': Colors.grey},
-    {'value': '0',  'label': 'Borrador',   'color': Colors.grey},
-    {'value': '1',  'label': 'En Curso',   'color': Colors.blue},
-    {'value': '2',  'label': 'Facturadas', 'color': Colors.orange},
-    {'value': '3',  'label': 'Terminada',  'color': Colors.green},
+    {'value': null, 'label': 'Todos', 'color': Colors.grey},
+    {'value': '0', 'label': 'Borrador', 'color': Colors.grey},
+    {'value': '1', 'label': 'En Curso', 'color': Colors.blue},
+    {'value': '2', 'label': 'Facturadas', 'color': Colors.orange},
+    {'value': '3', 'label': 'Terminada', 'color': Colors.green},
   ];
+
+  final List<Map<String, dynamic>> _refClientOptions = [
+    {'value': null, 'label': 'Todos'},
+    {'value': 'SRVT', 'label': 'SRVT'},
+    {'value': 'SRVD', 'label': 'SRVD'},
+    {'value': 'SRVI', 'label': 'SRVI'},
+    {'value': 'SRVR', 'label': 'SRVR'},
+  ];
+
+  String? _selectedRefClient; // Variable de estado
 
   @override
   void initState() {
@@ -97,31 +107,35 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
         widget.token,
         search: _searchController.text.trim(),
         statusFilter: _selectedStatus,
+        refClientfilter: _selectedRefClient
       );
 
       // Enriquecer con nombre real del cliente en paralelo
-      await Future.wait(loaded.map((intervention) async {
-        // Si ya viene el nombre no hacemos nada
-        if (intervention['thirdparty_name'] != null &&
-            intervention['thirdparty_name'].toString().isNotEmpty) return;
+      await Future.wait(
+        loaded.map((intervention) async {
+          // Si ya viene el nombre no hacemos nada
+          if (intervention['thirdparty_name'] != null &&
+              intervention['thirdparty_name'].toString().isNotEmpty)
+            return;
 
-        final socid = intervention['socid']?.toString();
-        if (socid == null || socid.isEmpty || socid == '0') return;
+          final socid = intervention['socid']?.toString();
+          if (socid == null || socid.isEmpty || socid == '0') return;
 
-        try {
-          final response = await http.get(
-            Uri.parse('${AppConstants.baseUrl}/thirdparties/$socid'),
-            headers: {
-              'DOLAPIKEY': widget.token,
-              'Accept': 'application/json',
-            },
-          );
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            intervention['thirdparty_name'] = data['name'] ?? 'Sin nombre';
-          }
-        } catch (_) {}
-      }));
+          try {
+            final response = await http.get(
+              Uri.parse('${AppConstants.baseUrl}/thirdparties/$socid'),
+              headers: {
+                'DOLAPIKEY': widget.token,
+                'Accept': 'application/json',
+              },
+            );
+            if (response.statusCode == 200) {
+              final data = json.decode(response.body);
+              intervention['thirdparty_name'] = data['name'] ?? 'Sin nombre';
+            }
+          } catch (_) {}
+        }),
+      );
 
       setState(() {
         interventions = loaded;
@@ -138,31 +152,46 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
   // ── Helpers de estado ───────────────────────────────────────
   Color _getStatusColor(String? s) {
     switch (s) {
-      case '0': return Colors.grey;
-      case '1': return Colors.blue;
-      case '2': return Colors.orange;
-      case '3': return Colors.green;
-      default:  return Colors.grey;
+      case '0':
+        return Colors.grey;
+      case '1':
+        return Colors.blue;
+      case '2':
+        return Colors.orange;
+      case '3':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
   String _getStatusLabel(String? s) {
     switch (s) {
-      case '0': return 'Borrador';
-      case '1': return 'En Curso';
-      case '2': return 'Facturadas';
-      case '3': return 'Terminada';
-      default:  return 'Desconocido';
+      case '0':
+        return 'Borrador';
+      case '1':
+        return 'En Curso';
+      case '2':
+        return 'Facturadas';
+      case '3':
+        return 'Terminada';
+      default:
+        return 'Desconocido';
     }
   }
 
   IconData _getStatusIcon(String? s) {
     switch (s) {
-      case '0': return Icons.edit_note;
-      case '1': return Icons.pending_actions;
-      case '2': return Icons.receipt_long;
-      case '3': return Icons.check_circle;
-      default:  return Icons.help_outline;
+      case '0':
+        return Icons.edit_note;
+      case '1':
+        return Icons.pending_actions;
+      case '2':
+        return Icons.receipt_long;
+      case '3':
+        return Icons.check_circle;
+      default:
+        return Icons.help_outline;
     }
   }
 
@@ -174,10 +203,20 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
         int.parse(timestamp.toString()) * 1000,
       );
       const months = [
-        'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+        'Ene',
+        'Feb',
+        'Mar',
+        'Abr',
+        'May',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dic',
       ];
-      final day   = date.day.toString().padLeft(2, '0');
+      final day = date.day.toString().padLeft(2, '0');
       final month = months[date.month - 1];
       return '$day $month ${date.year}';
     } catch (_) {
@@ -270,12 +309,16 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                       controller: _searchController,
                       decoration: InputDecoration(
                         hintText: 'Buscar por referencia o descripción...',
-                        prefixIcon:
-                            const Icon(Icons.search, color: Colors.blue),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.blue,
+                        ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear,
-                                    color: Colors.grey),
+                                icon: const Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: () {
                                   _searchController.clear();
                                   _loadInterventions();
@@ -288,8 +331,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 0),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       ),
                       onSubmitted: (_) => _loadInterventions(),
                       textInputAction: TextInputAction.search,
@@ -305,9 +347,8 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                         scrollDirection: Axis.horizontal,
                         itemCount: _statusOptions.length,
                         itemBuilder: (context, index) {
-                          final option    = _statusOptions[index];
-                          final isSelected =
-                              _selectedStatus == option['value'];
+                          final option = _statusOptions[index];
+                          final isSelected = _selectedStatus == option['value'];
                           final color = option['color'] as Color;
 
                           return Padding(
@@ -318,8 +359,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                               selectedColor: color.withOpacity(0.15),
                               checkmarkColor: color,
                               labelStyle: TextStyle(
-                                color:
-                                    isSelected ? color : Colors.grey[700],
+                                color: isSelected ? color : Colors.grey[700],
                                 fontWeight: isSelected
                                     ? FontWeight.bold
                                     : FontWeight.normal,
@@ -332,7 +372,54 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                               ),
                               onSelected: (_) {
                                 setState(
-                                    () => _selectedStatus = option['value']);
+                                  () => _selectedStatus = option['value'],
+                                );
+                                _loadInterventions();
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    SizedBox(
+                      height: 36,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _refClientOptions.length,
+                        itemBuilder: (context, index) {
+                          final option = _refClientOptions[index];
+                          final isSelected =
+                              _selectedRefClient == option['value'];
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              selected: isSelected,
+                              label: Text(option['label']),
+                              selectedColor: const Color(
+                                0xFF1565C0,
+                              ).withOpacity(0.15),
+                              checkmarkColor: const Color(0xFF1565C0),
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? const Color(0xFF1565C0)
+                                    : Colors.grey[700],
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                fontSize: 12,
+                              ),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? const Color(0xFF1565C0)
+                                    : Colors.grey.shade300,
+                              ),
+                              onSelected: (_) {
+                                setState(
+                                  () => _selectedRefClient = option['value'],
+                                );
                                 _loadInterventions();
                               },
                             ),
@@ -352,8 +439,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '${interventions.length} intervención(es) encontrada(s)',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ),
                 ),
@@ -371,8 +457,11 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error,
-                                size: 64, color: Colors.red),
+                            const Icon(
+                              Icons.error,
+                              size: 64,
+                              color: Colors.red,
+                            ),
                             const SizedBox(height: 16),
                             Text(errorMessage),
                             const SizedBox(height: 16),
@@ -388,13 +477,18 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.inbox,
-                                size: 80, color: Colors.grey[300]),
+                            Icon(
+                              Icons.inbox,
+                              size: 80,
+                              color: Colors.grey[300],
+                            ),
                             const SizedBox(height: 16),
                             Text(
                               'No hay intervenciones',
                               style: TextStyle(
-                                  fontSize: 18, color: Colors.grey[500]),
+                                fontSize: 18,
+                                color: Colors.grey[500],
+                              ),
                             ),
                             if (_selectedStatus != null ||
                                 _searchController.text.isNotEmpty)
@@ -403,6 +497,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                   setState(() {
                                     _selectedStatus = null;
                                     _searchController.clear();
+                                    _selectedRefClient = null;
                                   });
                                   _loadInterventions();
                                 },
@@ -418,8 +513,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                           itemCount: interventions.length,
                           itemBuilder: (context, index) {
                             final intervention = interventions[index];
-                            final status =
-                                intervention['statut']?.toString();
+                            final status = intervention['statut']?.toString();
                             final color = _getStatusColor(status);
 
                             return Container(
@@ -444,9 +538,9 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                     MaterialPageRoute(
                                       builder: (context) =>
                                           InterventionDetailScreen(
-                                        intervention: intervention,
-                                        token: widget.token,
-                                      ),
+                                            intervention: intervention,
+                                            token: widget.token,
+                                          ),
                                     ),
                                   );
                                   _loadInterventions();
@@ -463,8 +557,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                           Container(
                                             padding: const EdgeInsets.all(8),
                                             decoration: BoxDecoration(
-                                              color:
-                                                  color.withOpacity(0.12),
+                                              color: color.withOpacity(0.12),
                                               borderRadius:
                                                   BorderRadius.circular(10),
                                             ),
@@ -523,14 +616,16 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                           // Status badge
                                           Container(
                                             padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 3),
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: color.withOpacity(0.12),
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                               border: Border.all(
-                                                  color:
-                                                      color.withOpacity(0.4)),
+                                                color: color.withOpacity(0.4),
+                                              ),
                                             ),
                                             child: Text(
                                               _getStatusLabel(status),
@@ -548,14 +643,17 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                           Expanded(
                                             child: Row(
                                               children: [
-                                                Icon(Icons.business,
-                                                    size: 12,
-                                                    color: Colors.grey[400]),
+                                                Icon(
+                                                  Icons.business,
+                                                  size: 12,
+                                                  color: Colors.grey[400],
+                                                ),
                                                 const SizedBox(width: 4),
                                                 Expanded(
                                                   child: Text(
                                                     _getClientName(
-                                                        intervention),
+                                                      intervention,
+                                                    ),
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       color: Colors.grey[600],
@@ -575,13 +673,14 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                       // Fila fechas
                                       Row(
                                         children: [
-                                          Icon(Icons.calendar_today_rounded,
-                                              size: 12,
-                                              color: Colors.grey[400]),
+                                          Icon(
+                                            Icons.calendar_today_rounded,
+                                            size: 12,
+                                            color: Colors.grey[400],
+                                          ),
                                           const SizedBox(width: 4),
                                           Text(
-                                            _formatDate(
-                                                intervention['datec']),
+                                            _formatDate(intervention['datec']),
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: Colors.grey[600],
@@ -599,10 +698,13 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                                   .toString()
                                                   .isNotEmpty) ...[
                                             const SizedBox(width: 12),
-                                            Icon(Icons.folder_open,
-                                                size: 12,
-                                                color: const Color(0xFF1565C0)
-                                                    .withOpacity(0.7)),
+                                            Icon(
+                                              Icons.folder_open,
+                                              size: 12,
+                                              color: const Color(
+                                                0xFF1565C0,
+                                              ).withOpacity(0.7),
+                                            ),
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
@@ -613,8 +715,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                                                   color: Color(0xFF1565C0),
                                                   fontWeight: FontWeight.w500,
                                                 ),
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],
@@ -682,8 +783,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
                 backgroundColor: _fabExpanded
                     ? Colors.grey[700]
                     : const Color(0xFF1565C0),
-                child:
-                    const Icon(Icons.add, color: Colors.white, size: 28),
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
               ),
             ),
           ],

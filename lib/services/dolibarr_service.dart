@@ -69,7 +69,7 @@ class DolibarrService {
               page++; // Siguiente página
             }
           }
-        } else { 
+        } else {
           hasMore = false;
         }
       }
@@ -85,6 +85,7 @@ class DolibarrService {
     String token, {
     String? search,
     String? statusFilter,
+    String? refClientfilter,
     int limit = 100, // ✅ subimos el límite para traer todo y filtrar local
     int page = 0,
   }) async {
@@ -112,6 +113,13 @@ class DolibarrService {
         if (statusFilter != null && statusFilter.isNotEmpty) {
           data = data.where((i) {
             return i['statut']?.toString() == statusFilter;
+          }).toList();
+        }
+
+        if (refClientfilter != null && refClientfilter.isNotEmpty) {
+          data = data.where((i) {
+            final refClient = (i['ref_client'] ?? '').toString().toUpperCase();
+            return refClient.startsWith(refClientfilter);
           }).toList();
         }
 
