@@ -50,7 +50,7 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
   }
 
   Future<void> _loadFullData() async {
-    setState(() => _isLoading = true); 
+    setState(() => _isLoading = true);
 
     final fullData = await DolibarrService.getInterventionById(
       token: widget.token,
@@ -890,13 +890,22 @@ class _InterventionDetailScreenState extends State<InterventionDetailScreen>
                 final interventionRef =
                     _fullIntervention?['ref'] ?? intervention['ref'];
 
-                final result = await DolibarrService.uploadDocument(
-                  interventionRef:
-                      interventionRef, // La referencia de la intervención
-                  filePath: image.path,
-                  filename: image.name,
-                );
+                // Generar nombre limpio: REF_YYYYMMDD_HHMMSS.jpg
+                final now = DateTime.now();
+                final timestamp =
+                    '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
+                    '_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+                final extension = image.name.contains('.')
+                    ? image.name.split('.').last.toLowerCase()
+                    : 'jpg';
+                final cleanFilename =
+                    '${interventionRef}_$timestamp.$extension';
 
+                final result = await DolibarrService.uploadDocument(
+                  interventionRef: interventionRef,
+                  filePath: image.path,
+                  filename: cleanFilename,
+                );
                 // 4. Quitar el indicador de carga y mostrar resultado
                 Navigator.pop(context); // Cierra el loading
 

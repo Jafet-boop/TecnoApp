@@ -115,13 +115,15 @@ class DolibarrService {
           }).toList();
         }
 
-        // ✅ Filtro local por búsqueda
+        // Filtro local por búsqueda
         if (search != null && search.isNotEmpty) {
           data = data.where((i) {
             final ref = (i['ref'] ?? '').toString().toLowerCase();
             final desc = (i['description'] ?? '').toString().toLowerCase();
+            final refClient = (i['ref_client'] ?? '').toString().toLowerCase();
             return ref.contains(search.toLowerCase()) ||
-                desc.contains(search.toLowerCase());
+                desc.contains(search.toLowerCase()) ||
+                refClient.contains(search.toLowerCase());
           }).toList();
         }
 

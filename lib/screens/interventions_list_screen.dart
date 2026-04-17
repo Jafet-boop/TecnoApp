@@ -168,7 +168,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
 
   /// Formato "01 Abr 2026"
   String _formatDate(dynamic timestamp) {
-    if (timestamp == null || timestamp == '') return 'N/A';
+    if (timestamp == null || timestamp == '') return 'Sin Fecha';
     try {
       final date = DateTime.fromMillisecondsSinceEpoch(
         int.parse(timestamp.toString()) * 1000,
@@ -181,7 +181,7 @@ class _InterventionsListScreenState extends State<InterventionsListScreen>
       final month = months[date.month - 1];
       return '$day $month ${date.year}';
     } catch (_) {
-      return 'N/A';
+      return 'Sin Fecha';
     }
   }
 
